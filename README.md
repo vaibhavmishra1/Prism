@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://huggingface.co/datasets/vibhuiitj/prism-math"><img src="https://img.shields.io/badge/🤗%20Dataset-Prism--Math-blue" alt="Dataset"></a>
   <a href="https://huggingface.co/vibhuiitj/Prism-Solver"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Solver-orange" alt="Solver Model"></a>
-  <a href="https://huggingface.co/vibhuiitj/Prism-Questioner"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Solver-orange" alt="Questioner Model"></a>
+  <a href="https://huggingface.co/vibhuiitj/Prism-Questioner"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Questioner-orange" alt="Questioner Model"></a>
   <a href="tree/euclid/darwin/paper/report.md"><img src="https://img.shields.io/badge/📄%20Paper-Preprint-green" alt="Paper"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-red" alt="License"></a>
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python">
