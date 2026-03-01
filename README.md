@@ -5,8 +5,9 @@
 ### **Preventing Curriculum Collapse in Self-Evolving Reasoning Systems**
 
 <p align="center">
-  <a href="https://huggingface.co/datasets/PLACEHOLDER/prism-math"><img src="https://img.shields.io/badge/🤗%20Dataset-Prism--Math-blue" alt="Dataset"></a>
-  <a href="https://huggingface.co/PLACEHOLDER/prism-solver"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Solver-orange" alt="Models"></a>
+  <a href="https://huggingface.co/datasets/vibhuiitj/prism-math"><img src="https://img.shields.io/badge/🤗%20Dataset-Prism--Math-blue" alt="Dataset"></a>
+  <a href="https://huggingface.co/vibhuiitj/Prism-Solver"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Solver-orange" alt="Solver Model"></a>
+  <a href="https://huggingface.co/vibhuiitj/Prism-Questioner"><img src="https://img.shields.io/badge/🤗%20Models-Prism--Solver-orange" alt="Questioner Model"></a>
   <a href="tree/euclid/darwin/paper/report.md"><img src="https://img.shields.io/badge/📄%20Paper-Preprint-green" alt="Paper"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-red" alt="License"></a>
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python">
@@ -23,6 +24,10 @@
 *Self-evolving reasoning frameworks let LLMs improve by iteratively generating and solving problems — but they silently collapse into semantic repetition after a few iterations. **Prism** fixes this.*
 
 </div>
+
+<p align="center">
+  <img src="figures/iterations.png" alt="Prism self-evolution loop" width="85%">
+</p>
 
 ---
 
