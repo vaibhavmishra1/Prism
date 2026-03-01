@@ -1,0 +1,27 @@
+
+# Path to cluster centroids (built by cluster_space/build_clusters.py)
+centroids_path: "cluster_space/cluster_data/centroids.npy"
+
+# Embedding model for cluster assignment
+embedding_model: "Qwen/Qwen3-Embedding-0.6B"
+
+
+# Optional: path to cluster count frequencies from a previous iteration to warm-start EMA counts.
+# Can be absolute or relative to the project root. Leave as null to start from uniform counts.
+init_cluster_counts_path: null
+
+
+# Majority voting threshold - diversity reward only applied if score >= this
+majority_vote_threshold: 0.3
+
+lambda_weight: 5.0
+
+# EMA decay for cluster count tracking
+ema_decay: 0.99
+
+# Smoothing constant for log-inverse-frequency
+smoothing_alpha: 1.0
+
+# Logging frequency for cluster statistics (log every N reward computations)
+# Set to 1 to log every step, higher values reduce logging overhead
+log_cluster_stats_freq: 1

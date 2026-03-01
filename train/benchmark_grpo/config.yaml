@@ -1,0 +1,102 @@
+# ============================================================================
+# GRPO Training Config: All benchmark datasets merged
+# Model: Override via CLI: worker.actor.model.model_path=<your_model>
+# Datasets: Math500, GSM8K, AMC23, Minerva, OlympiadBench, AIME2024/2025,
+#           MMLU-Pro, BBEH, SuperGPQA, GPQA Diamond
+# Hardware: 8x A100 80GB
+# ============================================================================
+
+data:
+  train_files: ./benchmark_grpo/data/train.parquet
+  val_files: ./benchmark_grpo/data/val.parquet
+  prompt_key: question
+  answer_key: answer
+  image_key: images
+  max_prompt_length: 2048
+  max_response_length: 4096
+  rollout_batch_size: 512
+  val_batch_size: 256
+  format_prompt: ./examples/format_prompt/solver.jinja
+  override_chat_template: null
+  shuffle: true
+  seed: 42
+  max_pixels: 4194304
+  min_pixels: 262144
+  filter_overlong_prompts: true
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: false
+  use_kl_loss: true
+  kl_penalty: low_var_kl
+  kl_coef: 1.0e-4
+
+worker:
+  actor:
+    global_batch_size: 128
+    micro_batch_size_per_device_for_update: 4
+    micro_batch_size_per_device_for_experience: 16
+    max_grad_norm: 1.0
+    padding_free: true
+    ulysses_sequence_parallel_size: 1
+    model:
+      model_path: Qwen/Qwen3-4B-Base  # Override via CLI: worker.actor.model.model_path=<your_model>
+      enable_gradient_checkpointing: true
+      trust_remote_code: true
+      freeze_vision_tower: false
+    optim:
+      lr: 1.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.1
+      warmup_style: cosine
+      min_lr_ratio: 0.1
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+      offload_optimizer: false
+
+  rollout:
+    n: 8
+    temperature: 1.0
+    top_p: 0.99
+    gpu_memory_utilization: 0.7
+    enforce_eager: false
+    enable_chunked_prefill: false
+    tensor_parallel_size: 1
+    limit_images: 0
+    val_override_config:
+      temperature: 1.0
+      n: 1
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: true
+      enable_rank0_init: true
+    offload:
+      offload_params: true
+
+  reward:
+    reward_type: batch
+    reward_function: ./benchmark_grpo/reward_function.py:compute_score
+
+trainer:
+  total_epochs: 10
+  max_steps: 50
+  project_name: benchmark_grpo
+  experiment_name: darwin_all_benchmarks_grpo
+  logger: ["console", "wandb"]
+  nnodes: 1
+  n_gpus_per_node: 8
+  val_freq: 5
+  val_before_train: true
+  val_only: false
+  val_generations_to_log: 3
+  save_freq: 5
+  save_limit: 3
+  save_checkpoint_path: ./benchmark_grpo/checkpoints
+  load_checkpoint_path: null
