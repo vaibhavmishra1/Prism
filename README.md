@@ -348,7 +348,6 @@ Unlike existing synthetic datasets, Prism-Math is explicitly optimised for **sem
 
 📥 **[Download Prism-Math on HuggingFace](https://huggingface.co/datasets/vibhuiitj/prism-math)**
 
---
 
 ## 📖 Citation
 
@@ -371,7 +370,3 @@ If you use Prism or Prism-Math in your work, please cite:
 Prism builds on and extends [R-Zero](https://github.com/Chengsong-Huang/R-Zero) and uses the [verl](https://github.com/volcengine/verl) framework for GRPO training. We thank the authors of R-Zero, R-Few, Absolute Zero, and SPICE for their work and open-source contributions.
 
 ---
-
-<div align="center">
-<sub>Apache 2.0 License · Questions? Open an issue or reach out at <a href="mailto:vaibhavm209625@gmail.com">vaibhavm209625@gmail.com</a></sub>
-</div>
