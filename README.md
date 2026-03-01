@@ -175,10 +175,11 @@ Prism/
 ## ⚙️ Installation
 
 ```bash
-git clone https://github.com/PLACEHOLDER/prism.git
+git clone https://github.com/vaibhavmishra1/Prism.git
 cd prism
 
 pip install -r train/requirements.txt
+pip install flash_attn==2.7.4.post1 --no-build-isolation
 ```
 
 **Key dependencies:** `torch==2.7`, `vllm==0.9.1`, `transformers==4.52.4`, `ray==2.46.0`, `verl` (included in `train/verl/`)
@@ -198,49 +199,114 @@ export WANDB_API_KEY="your_wandb_key"
 ### Step 1 — Build the Cluster Space (one-time, offline)
 
 ```bash
-# Download the MATH corpus
+# Download the MATH + GSM8K corpus
 python cluster_space/download_corpus.py
 
-# Build K=128 semantic clusters using Qwen3-Embedding-0.6B
+# Embed questions and run K-Means to produce 128 cluster centroids
 python cluster_space/build_clusters.py \
     --num_clusters 128 \
     --embedding_model Qwen/Qwen3-Embedding-0.6B \
     --output_dir cluster_space/cluster_data/
 ```
 
-This produces `cluster_space/cluster_data/centroids.npy` — a fixed coordinate system over mathematical topics used throughout training.
+This produces `cluster_space/cluster_data/centroids.npy` — a fixed semantic coordinate system used as the diversity target throughout training.
 
-### Step 2 — Run the Full Prism Training Pipeline
+---
+
+### Step 2 — Train the Questioner
 
 ```bash
 cd train
 
 export HUGGINGFACENAME="your_hf_username"
+export STORAGE_PATH="/path/to/storage"   # defaults to train/storage/
 
 bash scripts/main_rentropy.sh \
-    Qwen/Qwen3-4B-Base \   # Questioner base model
-    Qwen/Qwen3-4B-Base \   # Solver base model
+    Qwen/Qwen3-4B-Base \   # Questioner base model (initialised from Solver)
+    Qwen/Qwen3-4B-Base \   # Solver base model (used for vLLM majority voting)
     qwen3-4b               # Experiment name prefix
 ```
 
-This orchestrates:
-1. **Questioner training** — GRPO with Prism's coverage-aware reward (6 steps/iteration)
-2. **Question generation** — parallel vLLM generation across GPUs
-3. **Question evaluation** — majority-vote solvability scoring
-4. **Dataset upload** — push filtered questions to HuggingFace
-5. **Solver training** — GRPO on the curated question pool (20 steps/iteration)
-6. **Evaluation** — benchmark suite after each solver update
+Internally this:
+- Downloads both models locally
+- Starts vLLM solver servers (GPUs 4–6) for majority-vote scoring
+- Trains the Questioner via GRPO with **Prism's coverage-aware reward** (GPUs 0–3, 6 steps)
+- Merges the final checkpoint → `$STORAGE_PATH/models/qwen3-4b_questioner_v1/.../huggingface/`
 
-### Step 3 — (Optional) Generate a Balanced Question Dataset
+---
+
+### Step 3 — Generate a Balanced Question Dataset
+
+Using the trained Questioner, generate questions and balance them across the 128 semantic clusters:
 
 ```bash
 cd question_generation_clustering
 
 python balanced_cluster_generation.py \
-    --models your_hf_username/questioner-iter1 your_hf_username/questioner-iter2 \
-    --centroids_dataset your_hf_username/math_clusters \
-    --output_file balanced_questions.json \
-    --max_per_cluster 100
+    --models $STORAGE_PATH/models/qwen3-4b_questioner_v1/.../huggingface \
+    --centroids_file ../cluster_space/cluster_data/centroids.npy \
+    --embedding_model Qwen/Qwen3-Embedding-0.6B \
+    --output_file balanced_questions_v1.json \
+    --max_per_cluster 100 \
+    --max_iterations 50
+```
+
+Then evaluate question quality via majority voting:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python evaluator.py \
+    --input_file balanced_questions_v1.json \
+    --model Qwen/Qwen3-4B-Base \
+    --num_samples 8
+# outputs → balanced_questions_v1_results.json
+```
+
+Upload the scored dataset to HuggingFace:
+
+```bash
+python create_hf_dataset_filtered.py   # uploads questions with score ∈ [0.5, 0.9]
+# or
+python create_hf_dataset.py            # uploads all scored questions
+```
+
+---
+
+### Step 4 — Train the Solver
+
+Train the Solver on the generated question dataset (reads from the HuggingFace repo uploaded in Step 3):
+
+```bash
+cd train
+
+QUESTIONER_CKPT="$STORAGE_PATH/models/qwen3-4b_questioner_v1/.../actor"
+
+bash scripts/solver_train.sh \
+    Qwen/Qwen3-4B-Base \   # Solver base model
+    $QUESTIONER_CKPT \     # Questioner checkpoint (used to set dataset name)
+    qwen3-4b_solver_v1     # Experiment name
+```
+
+This:
+- Trains the Solver via GRPO on `$HUGGINGFACENAME/qwen3-4b_solver_v1@train` (50 steps, 8 roll-outs)
+- Merges the final checkpoint
+- Runs the full evaluation suite across all 7 benchmarks
+
+---
+
+### Iterating (Multi-Iteration Self-Evolution)
+
+Repeat Steps 2–4, initialising each new Questioner from the **latest Solver checkpoint**:
+
+```bash
+# Iteration 2
+SOLVER_V1_CKPT="$STORAGE_PATH/models/qwen3-4b_solver_v1/.../actor"
+
+bash scripts/questioner_train_rentropy.sh \
+    $SOLVER_V1_CKPT \      # ← Solver becomes new Questioner init
+    $SOLVER_V1_CKPT \
+    qwen3-4b_questioner_v2
+
+# Then repeat Steps 3 & 4 for v2 ...
 ```
 
 ---
@@ -273,107 +339,16 @@ smoothing_alpha: 1.0
 init_cluster_counts_path: null
 ```
 
-**Hyperparameter sensitivity** (from ablations):
-
-| K (clusters) | MATH-500 | AIME 2024 |
-|:---:|:---:|:---:|
-| 64 | 63.60 | 14.78 |
-| **128** | **64.40** | **16.67** |
-| 256 | 63.80 | 15.42 |
-
-| λ | MATH-500 | AIME 2024 | Norm. Entropy |
-|:---:|:---:|:---:|:---:|
-| 1.0 | 63.00 | 13.47 | 0.74 |
-| 3.0 | 63.80 | 15.22 | 0.79 |
-| **5.0** | **64.40** | **16.67** | **0.83** |
-| 8.0 | 64.00 | 15.83 | 0.86 |
-
 ---
 
 ## 📊 Prism-Math Dataset
 
 As a byproduct of training, we release **Prism-Math** — ~100K semantically diverse, difficulty-calibrated synthetic math questions generated by the Prism questioner.
-
-| Property | Value |
-|---|---|
-| Total questions | ~100,000 |
-| Source | Prism Questioner (iterations 1–4) |
-| Base model | Qwen3-4B-Base |
-| Semantic clusters covered | 125 / 128 (97.7%) |
-| Median solvability p(q) | 0.72 |
-| Solvability range | [0.30, 0.90] |
-| Normalised entropy | 0.81 |
-| Gini coefficient | 0.68 |
-| Format | JSONL |
-| Fields | `question`, `answer`, `cluster_id`, `solvability`, `iteration` |
-| License | Apache 2.0 |
-
 Unlike existing synthetic datasets, Prism-Math is explicitly optimised for **semantic breadth** and **edge-of-solvability difficulty** across all 128 semantic clusters.
 
-📥 **[Download Prism-Math on HuggingFace](https://huggingface.co/datasets/PLACEHOLDER/prism-math)**
+📥 **[Download Prism-Math on HuggingFace](https://huggingface.co/datasets/vibhuiitj/prism-math)**
 
----
-
-## 🧮 Computational Overhead
-
-Prism's diversity mechanism is nearly free relative to GRPO training cost:
-
-| Component | R-Zero | Prism |
-|---|:---:|:---:|
-| Questioner GRPO training | 38 min | 38 min |
-| Embedding + cluster assignment | — | 2.4 min |
-| Question generation & filtering | 25 min | 25 min |
-| Solver GRPO training | 82 min | 82 min |
-| **Total per iteration** | **145 min** | **147.4 min** |
-| **Overhead** | — | **+1.7%** |
-
-Hardware: 8× H100 80GB node.
-
----
-
-## 📐 Method Details
-
-### Cluster Space Construction (offline, once)
-
-1. **Embed** — Every question in the MATH training set (~12.5K problems) is embedded with `Qwen3-Embedding-0.6B` → L₂-normalised vectors ∈ ℝ¹⁰²⁴
-2. **Cluster** — K-Means with K=128 → centroids {μ₁, …, μ₁₂₈} saved as a static artifact
-3. **Initialise** — Count vector **n** ∈ ℝᴷ set uniformly: nₖ = α ∀k
-
-### Cluster Assignment (per-step, online)
-
-```
-c(q) = argmax_k  ⟨embed(q), μ_k⟩
-```
-
-### EMA Coverage Update (per-batch)
-
-```
-n_k ← γ · n_k + (1 - γ) · 𝟏[k visited in batch]
-```
-
-This provides **cross-iteration memory**: over-sampled clusters stay elevated across co-evolution rounds, unlike batch-local BLEU penalties that reset every step.
-
-### Solver-Initialised Questioner
-
-In R-Zero: `Q_t ← GRPO(Q_{t-1}, S_{t-1})`  
-In Prism: `Q_t ← GRPO(S_{t-1}, vLLM(S_{t-1}))`
-
-Initialising from the Solver at each iteration (1) eliminates capability lag, (2) removes generation bias, and (3) breaks the narrowing chain of `Q_{t-1} → Q_t`.
-
----
-
-## 📋 Component Ablation
-
-| Diversity Reward | Solver Init | MATH-500 | AIME 2024 |
-|:---:|:---:|:---:|:---:|
-| ✗ | ✗ | 62.40 ± 0.54 | 11.35 ± 1.43 |
-| ✓ | ✗ | 63.20 ± 0.51 | 13.89 ± 1.52 |
-| ✗ | ✓ | 63.60 ± 0.48 | 14.22 ± 1.47 |
-| ✓ | ✓ | **64.40 ± 0.47** | **16.67 ± 1.38** |
-
-Both components contribute independently; the combination is super-additive.
-
----
+--
 
 ## 📖 Citation
 
