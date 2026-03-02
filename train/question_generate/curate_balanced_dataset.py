@@ -20,7 +20,7 @@ Usage:
         --centroids_file centroids.npy \
         --max_per_cluster 100 \
         --target_score 0.75 \
-        --min_score 0.3 \
+        --min_score 0.5 \
         --max_score 0.9
 
     # You can also load from local JSON files:
@@ -495,7 +495,7 @@ def curate_balanced_dataset(
     centroids_dataset: str,
     centroids_file: str = "centroids.npy",
     max_per_cluster: int = 100,
-    min_score: float = 0.3,
+    min_score: float = 0.5,
     max_score: float = 0.9,
     target_score: float = 0.75,
     dedup_threshold: float = 0.95,
@@ -790,8 +790,8 @@ Examples:
 
     # Score filtering
     score_group = parser.add_argument_group("Score Filtering")
-    score_group.add_argument("--min_score", type=float, default=0.3,
-                             help="Minimum majority voting score (default: 0.3)")
+    score_group.add_argument("--min_score", type=float, default=0.5,
+                             help="Minimum majority voting score (default: 0.5)")
     score_group.add_argument("--max_score", type=float, default=0.9,
                              help="Maximum majority voting score (default: 0.9)")
     score_group.add_argument("--target_score", type=float, default=0.75,

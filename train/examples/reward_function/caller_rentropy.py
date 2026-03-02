@@ -49,7 +49,7 @@ def load_rentropy_config() -> dict:
             
             "centroids_path": None,
             "weights": {"rarity": 0.5, "batch_uniqueness": 0.2, "within_cluster_uniqueness": 0.2},
-            "majority_vote_threshold": 0.3,
+            "majority_vote_threshold": 0.5,
             "ema_decay": 0.99,
             "smoothing_alpha": 1.0,
             "scale_diversity_by_zpd": False,  # Changed default to False to avoid double scaling
@@ -190,7 +190,7 @@ def accuracy_reward(predict: str, ground_truth: str) -> float:
 
 def compute_diversity_rewards(questions: List[str], base_scores: List[float]) -> List[float]:
    
-    threshold = RENTROPY_CONFIG.get("majority_vote_threshold", 0.3)
+    threshold = RENTROPY_CONFIG.get("majority_vote_threshold", 0.5)
     weights = RENTROPY_CONFIG.get("weights", {})
     
     n = len(questions)
@@ -307,7 +307,7 @@ def _log_cluster_stats(assigner: ClusterAssigner, cluster_ids: np.ndarray,
 
 def compute_zpd_reward(base_score: float, diversity_reward: float, lambda_weight: float) -> float:
     
-    if base_score < 0.3 or base_score > 0.9:
+    if base_score < 0.5 or base_score > 0.9:
         return 0.0
     
     # 2. ZPD with peak at 0.75 (optimal difficulty)

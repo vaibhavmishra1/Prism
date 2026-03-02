@@ -12,7 +12,7 @@ init_cluster_counts_path: null
 
 
 # Majority voting threshold - diversity reward only applied if score >= this
-majority_vote_threshold: 0.3
+majority_vote_threshold: 0.5
 
 lambda_weight: 5.0
 

@@ -92,7 +92,7 @@ R-Zero *worsens* coverage vs. the base model — a single cluster accumulates ~5
 │     ┌──────────────────────────────────────────────────────────┐    │
 │     │  Generate batch {q_g} ~ Q_t                              │    │
 │     │  Score via vLLM: p(q) = majority-vote solvability        │    │
-│     │  For q with p(q) ∈ [0.3, 0.9]:                          │    │
+│     │  For q with p(q) ∈ [0.5, 0.9]:                          │    │
 │     │    c(q) = nearest centroid to embed(q)  ← cluster assign │    │
 │     │    d(q) = exp(-n_c / n̄)                ← rarity bonus   │    │
 │     │    r(q) = zpd(p(q)) · (1 + λ·d(q))    ← final reward   │    │
@@ -111,7 +111,7 @@ R-Zero *worsens* coverage vs. the base model — a single cluster accumulates ~5
 r(q) = zpd(p(q))  ×  (1 + λ · exp(-n_{c(q)} / n̄))
         └── quality ──┘  └────── diversity bonus ──────┘
 
-zpd(p) = max(0, 1 - |p - 0.75| / 0.4),  p ∈ [0.3, 0.9]
+zpd(p) = max(0, 1 - |p - 0.75| / 0.4),  p ∈ [0.5, 0.9]
 λ = 5.0,  γ (EMA decay) = 0.99,  K = 128 clusters
 ```
 
@@ -323,7 +323,7 @@ centroids_path: "cluster_space/cluster_data/centroids.npy"
 embedding_model: "Qwen/Qwen3-Embedding-0.6B"
 
 # Majority voting threshold — diversity reward applied only if p(q) >= this
-majority_vote_threshold: 0.3
+majority_vote_threshold: 0.5
 
 # Diversity weight λ
 lambda_weight: 5.0
